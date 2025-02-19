@@ -34,7 +34,10 @@ class AdminController extends Controller
     public function dashboard()
     {
         $total_customers = Customer::count();
-        return view('index', compact('total_customers'));
+        $total_transactions = Transaction::count();
+        $total_amount = Transaction::sum('amount');
+        $average_amount = number_format(($total_amount / $total_transactions), 2);
+        return view('index', compact('total_customers', 'average_amount'));
     }
 
     public function customers()
