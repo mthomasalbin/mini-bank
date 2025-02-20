@@ -32,6 +32,8 @@ Route::group(['middleware' => 'auth:web'], function(){
 
     Route::get('/admin/add-customer', [AdminController::class, 'addCustomer'])->name('admin.add-customer');
 
+    Route::post('/admin/import-customers', [AdminController::class, 'importCustomers'])->name('admin.import-customers');
+
     Route::post('/admin/save-customer', [AdminController::class, 'saveCustomer'])->name('admin.save-customer');
 
     Route::get('/admin/view-transaction/{id}', [AdminController::class, 'viewTransaction'])->name('admin.view-transaction');

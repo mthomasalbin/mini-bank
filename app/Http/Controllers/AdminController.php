@@ -34,7 +34,7 @@ class AdminController extends Controller
     public function dashboard()
     {
         $total_customers = Customer::count();
-        $total_transactions = Transaction::count();
+        $total_transactions = Transaction::count() == 0 ? 1 : Transaction::count();
         $total_amount = Transaction::sum('amount');
         $average_amount = number_format(($total_amount / $total_transactions), 2);
         return view('index', compact('total_customers', 'average_amount'));
@@ -102,6 +102,57 @@ class AdminController extends Controller
         $id = decrypt($id);
         $user_transactions = Transaction::where('customer_id', $id)->get();
         return view('transactions', compact('user_transactions'));
+    }
+
+
+    public function importCustomers(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|mimes:csv|max:2048'
+        ]);
+
+
+        $file = $request->file('file');
+        $file_path = $file->getRealPath();
+
+        $transactions = [];
+
+        if (($handle = fopen($file_path, 'r')) !== FALSE) {
+            fgetcsv($handle);
+
+            while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
+                if (count($data) < 5) {
+                    continue;
+                }
+
+                $transactions[] = [
+                    'name' => trim($data[0]),
+                    'email' => filter_var(trim($data[1]), FILTER_VALIDATE_EMAIL) ? trim($data[1]) : null,
+                    'phone' => preg_replace('/[^0-9]/', '', trim($data[2])),
+                    'password' => bcrypt(trim($data[3])),
+                    'status' => in_array(strtolower(trim($data[4])), ['active', 'inactive']) ? strtolower(trim($data[4])) : 'inactive'
+                ];
+            }
+
+            fclose($handle);
+        }
+
+        if (empty($transactions)) {
+            return redirect()->route('admin.customers')->with('error', 'No valid data found in the CSV file.');
+        }
+
+        $chunks = array_chunk($transactions, 50);
+
+        try {
+            foreach ($chunks as $chunk) {
+                foreach ($chunk as $transaction) {
+                    Customer::create($transaction);
+                }
+            }
+            return redirect()->route('admin.customers')->with('success', 'Customers imported successfully!');
+        } catch (\Exception $e) {
+            return redirect()->route('admin.customers')->with('error', 'Import failed: ' . $e->getMessage());
+        }
     }
 
     public function logout()

@@ -27,3 +27,5 @@ Route::middleware('auth.customer:sanctum')->group(function () {
     Route::post('/transactions/debit', [APIController::class, 'debit']);
     Route::post('/customer/logout', [APIController::class, 'logout']);
 });
+
+Route::get('/customers', [APIController::class, 'customers']);

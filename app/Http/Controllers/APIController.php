@@ -80,8 +80,13 @@ class APIController extends Controller
 
     public function credit(Request $request)
     {
+        $customer = Auth::guard('sanctum')->user();
+
+        if (!$customer) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
         $rules = [
-            'customer_id' => 'required|exists:customers,id',
             'amount' => 'required|numeric|min:0'
         ];
 
@@ -95,8 +100,7 @@ class APIController extends Controller
                 "message" => 'Error'
             ]);
         }
-        
-        $customer = Customer::findOrFail($request->customer_id);
+
         $customer->balance += $request->amount;
         $customer->save();
 
@@ -123,8 +127,13 @@ class APIController extends Controller
 
     public function debit(Request $request)
     {
+        $customer = Auth::guard('sanctum')->user();
+
+        if (!$customer) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
         $rules = [
-            'customer_id' => 'required|exists:customers,id',
             'amount' => 'required|numeric|min:0'
         ];
 
@@ -138,8 +147,6 @@ class APIController extends Controller
                 "message" => 'Error'
             ]);
         }
-
-        $customer = Customer::findOrFail($request->customer_id);
 
         $todayTransactions = Transaction::where('customer_id', $customer->id)
                                          ->whereDate('created_at', today())
@@ -183,4 +190,43 @@ class APIController extends Controller
             'message' => 'Amount debited successfully'
         ]);
     }
+
+    public function customers(Request $request)
+    {
+        $perPage = $request->input('per_page', 10);
+        $page = $request->input('page', 1);
+
+        $customers = Customer::with(['transactions' => function ($query) {
+            $query->orderBy('id', 'desc')->take(5);
+        }])->paginate($perPage, ['*'], 'page', $page);
+
+        $data = $customers->map(function ($customer) {
+            return [
+                'customer_id' => $customer->id,
+                'name' => $customer->name,
+                'email' => $customer->email,
+                'phone' => $customer->phone,
+                'balance' => "₹" . $customer->balance,
+                'transactions' => $customer->transactions->map(function ($transaction) {
+                    return [
+                        'transaction_type' => $transaction->transaction_type,
+                        'amount' => "₹" . $transaction->amount
+                    ];
+                })
+            ];
+        });
+
+        return response()->json([
+            'error_code' => 0,
+            'data' => $data,
+            'pagination' => [
+                'total' => $customers->total(),
+                'per_page' => $customers->perPage(),
+                'current_page' => $customers->currentPage(),
+                'last_page' => $customers->lastPage(),
+            ],
+            'message' => 'Customers fetched successfully'
+        ]);
+    }
+
 }
